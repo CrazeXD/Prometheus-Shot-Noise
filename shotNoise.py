@@ -56,7 +56,7 @@ def scale_snr(baseline_snr: float,
 
     Applies the standard photon shot-noise scaling law:
 
-        SNR_target = SNR_baseline × √(F_target / F_baseline) × √(t_bin / t_baseline)
+        SNR_target = SNR_baseline * √(F_target / F_baseline) * √(t_bin / t_baseline)
 
     where the flux ratio is derived from the magnitude difference and the
     per-bin exposure time is ``transit_duration_hrs / num_bins``.
@@ -196,7 +196,7 @@ class SNRModel:
         )
 
     @classmethod
-    def from_uves_json(cls,
+    def from_json(cls,
                        json_path: str,
                        transit_params: TransitParams) -> "SNRModel":
         """Create a model from a UVES ETC JSON export.
