@@ -21,6 +21,10 @@ Three SNR "source" modes are supported:
    export (e.g. ESO UVES ETC).  Parsed, interpolated, and scaled in the
    same way as mode 2.
 
+4. **CSV** — A two-column CSV file (wavelength in nm, SNR) used directly
+   without any scaling.  The SNR curve is linearly interpolated onto the
+   simulation grid.
+
 The module is intentionally decoupled from the Prometheus simulation
 classes: it operates on plain NumPy arrays of wavelength and flux so
 that it can be slotted into any post-processing pipeline.
@@ -35,6 +39,7 @@ Usage overview
 Calculators can be found here: https://www.eso.org/observing/etc/
 """
 
+import csv
 import json
 import math
 from dataclasses import dataclass, field
@@ -244,6 +249,42 @@ class SNRModel:
             transit_params=transit_params,
         )
 
+    @classmethod
+    def from_csv(cls, csv_path: str) -> "SNRModel":
+        """Create a model from a two-column CSV file.
+
+        The CSV must have columns for wavelength (nm) and SNR, with no
+        scaling applied — the SNR values are used directly.
+
+        Parameters
+        ----------
+        csv_path : str
+            Path to the CSV file.  Expected columns: wavelength (nm), SNR.
+
+        Returns
+        -------
+        SNRModel
+        """
+        wav, snr = [], []
+        with open(csv_path, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or row[0].strip().startswith("#"):
+                    continue
+                try:
+                    w, s = float(row[0]), float(row[1])
+                except (ValueError, IndexError):
+                    continue  # skip header or malformed rows
+                wav.append(w)
+                snr.append(s)
+
+        idx = np.argsort(wav)
+        return cls(
+            mode="csv",
+            _wav_nm=np.array(wav)[idx],
+            _snr_arr=np.array(snr)[idx],
+        )
+
     # ── Evaluation ───────────────────────────────────────────────────────
 
     def snr_at(self, wavelength_nm: float) -> float:
@@ -261,6 +302,9 @@ class SNRModel:
         """
         if self.mode == "constant":
             return self._snr_value
+
+        if self.mode == "csv":
+            return float(np.interp(wavelength_nm, self._wav_nm, self._snr_arr))
 
         baseline_snr = float(np.interp(wavelength_nm, self._wav_nm, self._snr_arr))
         return scale_snr(
@@ -287,6 +331,9 @@ class SNRModel:
         """
         if self.mode == "constant":
             return np.full_like(wavelength_nm, self._snr_value, dtype=float)
+
+        if self.mode == "csv":
+            return np.interp(wavelength_nm, self._wav_nm, self._snr_arr)
 
         baseline_snr = np.interp(wavelength_nm, self._wav_nm, self._snr_arr)
         tp = self.transit_params
