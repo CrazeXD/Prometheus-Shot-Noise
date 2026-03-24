@@ -203,7 +203,8 @@ class SNRModel:
     @classmethod
     def from_json(cls,
                        json_path: str,
-                       transit_params: TransitParams) -> "SNRModel":
+                       transit_params: TransitParams,
+                       correction_factor: float = 1.0) -> "SNRModel":
         """Create a model from a UVES ETC JSON export.
 
         The JSON is expected to follow the ESO ETC v2 output schema::
@@ -219,6 +220,9 @@ class SNRModel:
             Path to the JSON file.
         transit_params : TransitParams
             Actual observing conditions for rescaling.
+        correction_factor : float, optional
+            Multiplicative correction applied to all SNR values (e.g.
+            telescope area ratio).  Defaults to 1.0 (no correction).
 
         Returns
         -------
@@ -234,7 +238,7 @@ class SNRModel:
             snr_vals = np.array(det["plots"]["snr"]["snr"])
             valid = (snr_vals > 0) & np.isfinite(snr_vals)
             all_wav.extend((wav_m[valid] * 1e9).tolist())
-            all_snr.extend(snr_vals[valid].tolist())
+            all_snr.extend((snr_vals[valid] * correction_factor).tolist())
 
         idx = np.argsort(all_wav)
         baseline_mag = data["input"]["target"]["brightness"]["mag"]
